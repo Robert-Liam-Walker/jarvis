@@ -33,6 +33,99 @@ def test_focus_change_blocks_input(monkeypatch):
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows adapter")
+def test_focus_window_does_not_restore_an_already_visible_window(monkeypatch):
+    from typesafe_computer_use import windows
+
+    calls = []
+
+    class FakeUser32:
+        foreground = 10
+
+        def GetForegroundWindow(self):
+            return self.foreground
+
+        def IsIconic(self, hwnd):
+            return False
+
+        def ShowWindowAsync(self, hwnd, command):
+            calls.append(("restore", hwnd, command))
+
+        def GetWindowThreadProcessId(self, hwnd, _pid):
+            return {10: 110, 20: 120}[hwnd]
+
+        def AttachThreadInput(self, current, target, attach):
+            calls.append(("attach", current, target, bool(attach)))
+            return True
+
+        def BringWindowToTop(self, hwnd):
+            calls.append(("top", hwnd))
+
+        def SetForegroundWindow(self, hwnd):
+            calls.append(("foreground", hwnd))
+            self.foreground = hwnd
+
+        def SetFocus(self, hwnd):
+            calls.append(("focus", hwnd))
+
+        def keybd_event(self, *_args):
+            raise AssertionError("Alt fallback should not run after successful activation")
+
+    fake = FakeUser32()
+    monkeypatch.setattr(windows, "user32", fake)
+    monkeypatch.setattr(windows.kernel32, "GetCurrentThreadId", lambda: 100)
+
+    assert windows._focus_window(20, timeout=0) is True
+    assert not any(call[0] == "restore" for call in calls)
+    assert ("attach", 100, 110, True) in calls
+    assert ("attach", 100, 120, True) in calls
+    assert ("attach", 100, 110, False) in calls
+    assert ("attach", 100, 120, False) in calls
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows adapter")
+def test_focus_window_restores_a_minimized_window(monkeypatch):
+    from typesafe_computer_use import windows
+
+    calls = []
+
+    class FakeUser32:
+        foreground = 20
+
+        def GetForegroundWindow(self):
+            return 10
+
+        def IsIconic(self, hwnd):
+            return True
+
+        def ShowWindowAsync(self, hwnd, command):
+            calls.append(("restore", hwnd, command))
+
+        def GetWindowThreadProcessId(self, hwnd, _pid):
+            return {10: 110, 20: 120}[hwnd]
+
+        def AttachThreadInput(self, *_args):
+            return False
+
+        def BringWindowToTop(self, _hwnd):
+            return None
+
+        def SetForegroundWindow(self, _hwnd):
+            return None
+
+        def SetFocus(self, _hwnd):
+            return None
+
+        def keybd_event(self, *_args):
+            return None
+
+    monkeypatch.setattr(windows, "user32", FakeUser32())
+    monkeypatch.setattr(windows.kernel32, "GetCurrentThreadId", lambda: 100)
+
+    assert windows._focus_window(20, timeout=0) is False
+    assert calls == [("restore", 20, 9)]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows adapter")
 def test_mcp_stop_file_replaces_mouse_corner_abort(monkeypatch, tmp_path):
     from typesafe_computer_use import windows
     from typesafe_computer_use.models import Abort

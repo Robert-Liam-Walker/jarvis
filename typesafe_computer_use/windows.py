@@ -26,6 +26,14 @@ user32.GetForegroundWindow.restype = wintypes.HWND
 user32.SetForegroundWindow.argtypes = [wintypes.HWND]
 user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
 user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+user32.ShowWindowAsync.argtypes = [wintypes.HWND, ctypes.c_int]
+user32.IsIconic.argtypes = [wintypes.HWND]
+user32.IsIconic.restype = wintypes.BOOL
+user32.BringWindowToTop.argtypes = [wintypes.HWND]
+user32.SetFocus.argtypes = [wintypes.HWND]
+user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+kernel32.GetCurrentThreadId.restype = wintypes.DWORD
 with contextlib.suppress(AttributeError, OSError):
     user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
 auto.SetGlobalSearchTimeout(0.5)
@@ -106,6 +114,45 @@ def frontmost_pid():
     return _pid(_foreground())
 
 
+def _focus_window(hwnd, timeout=3.0):
+    """Activate a known top-level window despite Windows' foreground lock."""
+    if _foreground() == hwnd:
+        return True
+    if user32.IsIconic(hwnd):
+        user32.ShowWindowAsync(hwnd, 9)  # SW_RESTORE only when minimized
+    current_thread = kernel32.GetCurrentThreadId()
+    foreground_thread = user32.GetWindowThreadProcessId(_foreground(), None)
+    target_thread = user32.GetWindowThreadProcessId(hwnd, None)
+    attached = []
+    try:
+        for thread in {foreground_thread, target_thread}:
+            if thread and thread != current_thread and user32.AttachThreadInput(current_thread, thread, True):
+                attached.append(thread)
+        user32.BringWindowToTop(hwnd)
+        user32.SetForegroundWindow(hwnd)
+        user32.SetFocus(hwnd)
+    finally:
+        for thread in attached:
+            user32.AttachThreadInput(current_thread, thread, False)
+    if _foreground() != hwnd:
+        # Windows may reject foreground activation from an MCP child process.
+        # A balanced Alt tap grants the standard foreground transition without
+        # typing text or targeting any control.
+        user32.keybd_event(0x12, 0, 0, 0)
+        try:
+            user32.SetForegroundWindow(hwnd)
+        finally:
+            user32.keybd_event(0x12, 0, 2, 0)
+    if _foreground() == hwnd:
+        return True
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        if _foreground() == hwnd:
+            return True
+        time.sleep(0.05)
+    return False
+
+
 def _guard():
     check_abort()
     if not _observed_hwnd or _foreground() != _observed_hwnd:
@@ -162,12 +209,7 @@ def activate(app, timeout=3.0):
     if len(matches) != 1:
         return False
     matches[0].SetActive()
-    end = time.monotonic() + timeout
-    while time.monotonic() < end:
-        if frontmost_app().lower() == app.lower():
-            return True
-        time.sleep(0.05)
-    return False
+    return _focus_window(matches[0].NativeWindowHandle, timeout)
 
 
 def activate_title(title):
@@ -175,8 +217,7 @@ def activate_title(title):
     if len(matches) != 1:
         raise Abort("target title must identify exactly one open window")
     matches[0].SetActive()
-    time.sleep(0.1)
-    if _foreground() != matches[0].NativeWindowHandle:
+    if not _focus_window(matches[0].NativeWindowHandle):
         raise Abort("target window could not be activated")
 
 

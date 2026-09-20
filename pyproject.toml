@@ -1,6 +1,6 @@
 [project]
 name = "typesafe-computer-use"
-version = "0.2.0"
+version = "0.2.1"
 description = "Windows port of awlevin/typesafe-computer-use, preserving the Jev decision loop with local OCR/UIA and an agent-independent writer handoff."
 readme = "README.md"
 license = "MIT"
