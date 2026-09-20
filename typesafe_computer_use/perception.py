@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import math
+import sys
 from dataclasses import replace
 from pathlib import Path
 
-from ocrmac import ocrmac
+if sys.platform == "win32":
+    from . import windows_ocr as ocrmac
+else:
+    from ocrmac import ocrmac
 from PIL import Image, ImageChops, ImageStat
 
 from . import macos
@@ -58,6 +62,8 @@ def capture(
         field = None if replay else macos.focused_field()
     with phase(timing, "url"):
         page_url = url if url is not None else (None if replay else macos.browser_url(browser))
+    if not image_path and hasattr(macos, "validate_capture"):
+        macos.validate_capture()
     return Screen(image=image, scale=macos.display_scale(image), app=frontmost, field=field, url=page_url, pid=pid, window=window)
 
 
@@ -264,7 +270,10 @@ def tile_changed(
     a, b = _patch(thumb, tile, divisor), _patch(previous, tile, divisor)
     if a.size != b.size or not a.width or not a.height:
         return True
-    return ImageStat.Stat(ImageChops.difference(a, b)).mean[0] > threshold
+    diff = ImageChops.difference(a, b)
+    # A changed checkmark or short status line can be diluted by the tile's empty
+    # background. Retain the mean/noise rule and also detect local strong changes.
+    return ImageStat.Stat(diff).mean[0] > threshold or diff.getextrema()[1] > 32
 
 
 def _patch(thumb: Image.Image, tile: Box, divisor: int) -> Image.Image:
@@ -476,6 +485,7 @@ def to_ax_items(nodes: list[AxNode], scale: float) -> list[Item]:
             y2=(node.y + node.h) * scale,
             role=node.role_word,
             source="ax",
+            state=node.state,
         )
         for i, node in enumerate(nodes)
     ]
@@ -513,7 +523,7 @@ def merge_with_origins(ocr_items: list[Item], ax_items: list[Item], budget: int 
         block = ocr_items[best]
         taken.add(best)
         text = control.text if len(control.text) >= len(block.text) else block.text
-        merged.append((replace(block, text=text, role=control.role, source="ax+ocr"), origin))
+        merged.append((replace(block, text=text, role=control.role, source="ax+ocr", state=control.state), origin))
     merged += [(block, None) for i, block in enumerate(ocr_items) if i not in taken]
     kept = [merged[i] for i in kept_by_budget([it for it, _ in merged], budget)]
     order = reading_order([it for it, _ in kept])

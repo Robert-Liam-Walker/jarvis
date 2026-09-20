@@ -16,6 +16,7 @@ from .writer import compose_text, compose_url
 
 VERIFY_THRESHOLD = 0.5
 NOOP_MARKERS = ("refused", "failed", "waited")
+WAIT_SECONDS = 0.8
 
 
 @dataclass(frozen=True)
@@ -133,6 +134,8 @@ def _type_text(decision, screen: Screen, items, ctx: Context) -> str:
     text = compose_text(ctx.writer, ctx.goal, screen, items, ctx.history)
     if not text:
         return "type_text refused: writer declined to fill this field"
+    if hasattr(ctx.writer, "structured") and hasattr(macos, "prepare_after_host"):
+        macos.prepare_after_host(screen)
     how = fill_field(screen.field, text)
     time.sleep(0.3)
     p = verify_typed(ctx.typesafe, ctx.goal, screen.field, text, macos.focused_field())
@@ -158,6 +161,12 @@ def _scroll(lines: int, description: str):
     return handler
 
 
+def _wait(decision, screen, items, ctx) -> str:
+    """Give an in-progress interface enough time to publish its next controls."""
+    time.sleep(WAIT_SECONDS)
+    return "waited"
+
+
 _HANDLERS = {
     "use_browser": _use_browser,
     "type_email": _type_email,
@@ -166,5 +175,5 @@ _HANDLERS = {
     "press_escape": _key("escape", "pressed Escape"),
     "scroll_down": _scroll(-10, "scrolled down"),
     "scroll_up": _scroll(10, "scrolled up"),
-    "wait": lambda decision, screen, items, ctx: "waited",
+    "wait": _wait,
 }

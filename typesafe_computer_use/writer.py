@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import os
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -19,6 +20,12 @@ from .perception import near_field
 
 def make_writer() -> anthropic.Anthropic | None:
     """A client, or None when no Anthropic credentials resolve (the SDK only checks on first request)."""
+    if os.environ.get("CLICKER_HOST_DIR"):
+        from .host_writer import HostWriter
+
+        return HostWriter(os.environ["CLICKER_HOST_DIR"])
+    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+        return None
     client = anthropic.Anthropic()
     if client.api_key or getattr(client, "auth_token", None):
         return client
@@ -37,6 +44,8 @@ def _structured(
     model: str | None = None,
     image: Image.Image | None = None,
 ) -> dict:
+    if hasattr(writer, "structured"):
+        return writer.structured(system=system, packet=packet, properties=properties, image=image)
     content: list[dict] = [{"type": "text", "text": json.dumps(packet)}]
     if image is not None:
         content.insert(0, _image_block(image))

@@ -22,6 +22,9 @@ DOTENV = Path.cwd() / ".env"
 
 def _prepare() -> None:
     config.load_dotenv(DOTENV)
+    from .credentials import prepare_provider
+
+    prepare_provider()
     if not os.environ.get("TYPESAFE_API_KEY"):
         sys.exit("TYPESAFE_API_KEY is not set (export it or put it in .env)")
 
@@ -32,6 +35,7 @@ def main(argv: list[str] | None = None) -> None:
         description="Drive this computer toward a goal: screen OCR, a TypeSafe classifier, deterministic actions.",
     )
     parser.add_argument("goal", help="what you want done on this computer")
+    parser.add_argument("--window-title", help="Windows: activate exactly one observed window title before starting")
     parser.add_argument("--act", action="store_true", help="actually click and type (default: dry run, one step)")
     parser.add_argument("--steps", type=int, default=config.DEFAULT_STEPS, help="max actions before stopping")
     parser.add_argument("--min-confidence", type=float, default=config.DEFAULT_MIN_CONFIDENCE, help="stop below this confidence")
@@ -43,6 +47,8 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     _prepare()
+    if args.window_title:
+        macos.activate_title(args.window_title)
     if args.act and not macos.accessibility_trusted():
         sys.exit("this terminal lacks Accessibility permission; grant it in System Settings > Privacy & Security")
     writer = make_writer()
@@ -111,5 +117,13 @@ def inspect(argv: list[str] | None = None) -> None:
     print(format_timing(timing))
     print(f"  {annotated}\n  {text}")
     if not args.no_open:
-        subprocess.run(["open", str(annotated)], check=False)
-        subprocess.run(["open", "-t", str(text)], check=False)
+        if sys.platform == "win32":
+            os.startfile(annotated)
+            os.startfile(text)
+        else:
+            subprocess.run(["open", str(annotated)], check=False)
+            subprocess.run(["open", "-t", str(text)], check=False)
+
+
+if __name__ == "__main__":
+    main()

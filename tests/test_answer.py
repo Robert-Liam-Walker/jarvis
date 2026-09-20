@@ -178,3 +178,15 @@ def test_an_action_makes_the_last_capture_stale(tmp_path, screen, monkeypatch):
 
     assert keep_going
     assert state.view is None
+
+
+def test_repeated_scrolls_can_continue_through_a_long_list(tmp_path, screen, monkeypatch):
+    monkeypatch.setattr(runner, "perform", lambda *a: "scrolled down")
+    state = RunState()
+    _, log = logged()
+    cfg = RunConfig(goal=GOAL, out=tmp_path, act=True)
+
+    for _ in range(4):
+        assert resolve(cfg, context(), state, screen, [], decision("scroll_down"), {}, log)
+
+    assert state.consecutive_noops == 0

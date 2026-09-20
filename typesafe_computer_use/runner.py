@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -73,7 +74,9 @@ def run(cfg: RunConfig, ctx_factory) -> RunState:
     state = RunState()
     started = time.time()
     try:
-        with TypeSafeClient() as typesafe:
+        with TypeSafeClient(
+            base_url=os.environ.get("TYPESAFE_BASE_URL"), model=os.environ.get("TYPESAFE_DEFAULT_MODEL"), timeout=20
+        ) as typesafe:
             ctx = ctx_factory(typesafe, state.history)
             for step in range(1, cfg.steps + 1):
                 if not run_step(cfg, ctx, state, step, log):
@@ -208,7 +211,9 @@ def resolve(
     with phase(timing, "act"):
         what = perform(decision, screen, items, ctx)
     state.view = None
-    repeated = bool(state.history) and state.history[-1] == what and screen.url == state.last_url
+    repeated = (
+        bool(state.history) and state.history[-1] == what and screen.url == state.last_url and not what.startswith("scrolled ")
+    )
     state.last_url = screen.url
     state.history.append(what)
     log(f"  did: {what}")

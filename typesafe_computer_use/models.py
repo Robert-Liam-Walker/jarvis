@@ -53,6 +53,7 @@ class Item:
     y2: float
     role: str = ""
     source: str = "ocr"
+    state: tuple[str, ...] = ()
 
     @property
     def center(self) -> tuple[float, float]:
@@ -78,6 +79,7 @@ class AxNode:
     w: float
     h: float
     pressable: bool
+    state: tuple[str, ...] = ()
     ref: object | None = field(default=None, compare=False, repr=False)
 
     @property

@@ -58,8 +58,8 @@ def ocr_item(index, text, x1, y1, x2, y2, conf=0.9):
     return Item(index, text, conf, float(x1), float(y1), float(x2), float(y2))
 
 
-def ax_item(index, text, x1, y1, x2, y2, role="button"):
-    return Item(index, text, 1.0, float(x1), float(y1), float(x2), float(y2), role=role, source="ax")
+def ax_item(index, text, x1, y1, x2, y2, role="button", state=()):
+    return Item(index, text, 1.0, float(x1), float(y1), float(x2), float(y2), role=role, source="ax", state=state)
 
 
 def test_merge_folds_an_overlapping_control_onto_the_ocr_block_that_names_it():
@@ -69,6 +69,13 @@ def test_merge_folds_an_overlapping_control_onto_the_ocr_block_that_names_it():
     assert merged.source == "ax+ocr" and merged.role == "link"
     assert merged.text == "Register Now for Disrupt"  # the longer of the two labels
     assert (merged.x1, merged.y1, merged.x2, merged.y2) == (100.0, 100.0, 300.0, 130.0)  # the OCR box
+
+
+def test_merge_keeps_accessibility_state_when_it_folds_onto_ocr():
+    block = ocr_item(0, "Record 38", 100, 100, 300, 130)
+    control = ax_item(0, "Record 38", 100, 100, 300, 130, role="cell", state=("selected",))
+    (merged,) = merge_sources([block], [control])
+    assert merged.source == "ax+ocr" and merged.state == ("selected",)
 
 
 def test_merge_matches_on_shared_words_not_only_containment():

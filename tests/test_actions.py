@@ -88,6 +88,15 @@ def test_a_fallback_click_is_not_treated_as_a_no_op():
     assert not actions.is_noop("clicked 'Register Now' (accessibility press did not take)")
 
 
+def test_wait_allows_a_dynamic_interface_to_settle(screen, monkeypatch):
+    pauses = []
+    monkeypatch.setattr(actions.time, "sleep", lambda seconds: pauses.append(seconds))
+    decision = SimpleNamespace(chosen="wait")
+
+    assert actions.perform(decision, screen, [], None) == "waited"
+    assert pauses == [actions.WAIT_SECONDS]
+
+
 def context(writer=None) -> actions.Context:
     return actions.Context(
         goal="find the next upcoming bruno mars concert",

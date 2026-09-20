@@ -3,18 +3,40 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/awlevin/typesafe-computer-use/actions/workflows/ci.yaml"><img alt="CI" src="https://github.com/awlevin/typesafe-computer-use/actions/workflows/ci.yaml/badge.svg"></a>
+  <a href="https://github.com/kofanlabs/typesafe-computer-use-windows/actions"><img alt="CI" src="https://github.com/kofanlabs/typesafe-computer-use-windows/actions/workflows/ci.yaml/badge.svg"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white">
-  <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-000000?logo=apple&logoColor=white">
+  <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white">
   <a href="https://docs.typesafe.ai"><img alt="TypeSafe" src="https://img.shields.io/badge/decisions-TypeSafe%20jev-8b5cf6"></a>
   <a href="https://github.com/astral-sh/ruff"><img alt="Ruff" src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json"></a>
 </p>
 
-**typesafe-computer-use** drives a Mac toward a goal you type in plain English, for about a
-fiftieth of a cent per step. It never sends a screenshot to a big model. Instead it
-reads the screen deterministically, asks a small classifier which action comes next,
-and only calls a writing model when a text field genuinely needs free text.
+**typesafe-computer-use-windows** drives a selected Windows application toward a
+goal you type in plain English. It reads the target window with local Windows OCR
+and UI Automation, asks Jev which action comes next, and only asks the MCP host
+agent for free text or final-screen interpretation when needed.
+
+This KofanLabs fork ports
+[`awlevin/typesafe-computer-use`](https://github.com/awlevin/typesafe-computer-use)
+to Windows while preserving the original dynamic decision loop. It is not an
+official TypeSafe product.
+
+## Windows quick start
+
+Requirements: Windows 10/11, Python 3.12+, Node.js 20+, and a TypeSafe Jev API
+key (or a Vercel AI Gateway key with access to Jev).
+
+1. Download or clone this repository.
+2. Double-click **`Install-Windows.cmd`**.
+3. Open **`1-Baslat.cmd`**, choose **API anahtarını değiştir**, and paste the key
+   into the hidden prompt.
+4. Add the generated `mcp-config.json` to Codex, Grok, Claude Desktop, or another
+   MCP host, then restart that host.
+5. Ask the host to use **Jev Computer Use** on a specific open window.
+
+The API key is encrypted with Windows DPAPI and never stored as plaintext. See
+[WINDOWS.md](WINDOWS.md) for Turkish usage notes and [SECURITY.md](SECURITY.md)
+for the trust boundary.
 
 ```
 clicker "go to techcrunch and take me to the checkout page for the cheapest tickets to their next upcoming event" --act
@@ -46,7 +68,7 @@ The honest caveat: the big model read the event dates off the pixels and compare
 unaided. The classifier needed the date parsing described below. Every piece of
 reasoning the frontier model does for free has to be rebuilt here as deterministic state.
 
-## Install
+## Original macOS installation
 
 macOS 14 or newer, Python 3.12 or newer, [uv](https://docs.astral.sh/uv/).
 
@@ -303,3 +325,7 @@ CI runs the same on macOS. See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 [MIT](LICENSE)
+
+This fork is based on upstream commit
+`cc7b5066ae1a07b5e3182e8f87a9b5b6dfdcffc1` and retains the original MIT
+license and attribution.

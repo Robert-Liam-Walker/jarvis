@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from PIL import ImageDraw, ImageFont
@@ -10,7 +11,7 @@ from PIL import ImageDraw, ImageFont
 from .decide import base_state, item_criteria, kind_criteria, offscreen_criteria, site_criteria
 from .models import Item, Screen
 
-FONT_PATH = "/System/Library/Fonts/Helvetica.ttc"
+FONT_PATH = "C:/Windows/Fonts/arial.ttf" if sys.platform == "win32" else "/System/Library/Fonts/Helvetica.ttc"
 RULE = "=" * 78
 
 
