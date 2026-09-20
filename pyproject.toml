@@ -7,7 +7,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 authors = [{ name = "Aaron Levin" }]
-keywords = ["computer-use", "automation", "ocr", "typesafe", "macos", "agents"]
+keywords = ["computer-use", "automation", "ocr", "typesafe", "windows", "macos", "mcp", "agents"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: MacOS X",
@@ -37,8 +37,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/awlevin/typesafe-computer-use"
-Issues = "https://github.com/awlevin/typesafe-computer-use/issues"
+Homepage = "https://github.com/kofanlabs/typesafe-computer-use-windows"
+Issues = "https://github.com/kofanlabs/typesafe-computer-use-windows/issues"
+Upstream = "https://github.com/awlevin/typesafe-computer-use"
 
 [project.scripts]
 clicker = "typesafe_computer_use.cli:main"

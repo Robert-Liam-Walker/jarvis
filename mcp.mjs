@@ -10,7 +10,7 @@ import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
-const server = new McpServer({name:'typesafe-computer-use-windows',version:'0.2.0'});
+const server = new McpServer({name:'typesafe-computer-use-windows',version:'0.2.2'});
 let active = null;
 const json = p => fs.existsSync(p) ? JSON.parse(fs.readFileSync(p,'utf8').replace(/^\uFEFF/,'')) : null;
 const result = data => ({content:[{type:'text',text:JSON.stringify(data,null,2)}]});

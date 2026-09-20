@@ -2,7 +2,8 @@
 
 This repository is derived from commit `cc7b5066ae1a07b5e3182e8f87a9b5b6dfdcffc1`
 of **awlevin/typesafe-computer-use**. It retains the original MIT license and
-README. This is an independent Windows port, not an official TypeSafe product.
+documentation in [the upstream reference](docs/upstream-macos-reference.md).
+This is an independent Windows port, not an official TypeSafe product.
 
 ## Preserved decision loop
 
