@@ -1,66 +1,121 @@
-# TypeSafe Computer Use — Windows uyarlaması
+# TypeSafe Computer Use — Windows port
 
-Bu klasör, **awlevin/typesafe-computer-use** projesinin `cc7b5066ae1a07b5e3182e8f87a9b5b6dfdcffc1` sürümünden türetildi. Özgün MIT lisansı ve README korunmuştur. Bu resmi TypeSafe ürünü değildir. Önceki `jev-computer-use` klasörü ayrı ve dar kapsamlı prototipti; ajan bağlantısında artık bu uyarlama kullanılır.
+This repository is derived from commit `cc7b5066ae1a07b5e3182e8f87a9b5b6dfdcffc1`
+of **awlevin/typesafe-computer-use**. It retains the original MIT license and
+README. This is an independent Windows port, not an official TypeSafe product.
 
-## Korunan işleyiş
+## Preserved decision loop
 
-Ekranı oku → OCR ve erişilebilirlik öğelerini birleştir → tek Jev isteğinde işlem/hedef/site seç → uygula → tekrar oku. Özgün karar soruları, tarih işleme, seçenek üretimi, yazı doğrulama, görev geçmişi, durma koşulları ve sonuç değerlendirme korunur. Metinler veya tıklanacak düğmeler görev başında tek tek hazırlanmak zorunda değildir.
+Capture the selected window → combine OCR and accessibility controls → ask Jev
+for an operation and target in one request → execute → observe again.
 
-## Windows karşılıkları
+The original decision questions, date handling, option generation, text
+validation, task history, stopping conditions, and final-screen evaluation remain
+available. Tasks do not require a prewritten list of clicks or field values.
 
-| Özgün macOS bileşeni | Windows karşılığı |
+## Windows equivalents
+
+| Original macOS component | Windows implementation |
 |---|---|
-| Vision OCR | Windows.Media.Ocr, yerel |
-| AX erişilebilirlik | UI Automation |
-| Quartz giriş | Windows klavye/fare girdisi ve UIA işlemleri |
-| Ekran yakalama | Yalnız hedef pencereyi PrintWindow ile yakalama, DPI eşleme |
-| AppleScript uygulama yönetimi | Gözlemlenen Windows pencereleri |
-| Yardımcı Anthropic modeli | Mevcut ana ajanla MCP üzerinden yazıcı/sonuç isteği; özgün Anthropic seçeneği de korunur |
+| Vision OCR | Local `Windows.Media.Ocr` |
+| AX accessibility | Windows UI Automation |
+| Quartz input | Windows keyboard/mouse input and UIA actions |
+| Screen capture | DPI-aware `PrintWindow` capture of only the selected window |
+| AppleScript app management | Observed Windows windows and foreground activation |
+| Auxiliary writer model | MCP handoff to the current host agent; the original Anthropic option remains available for direct CLI use |
 
-Ana ajan Grok, Codex veya başka bir model olabilir; MCP araçlarını kullanabilmesi ve istenen şemayla cevap verebilmesi gerekir. Her tıklamada ana modele dönülmez. Serbest metin, katalog dışı URL ve son ekran değerlendirmesi için ana ajana dönülür.
+The host can be Codex, Grok, or any other agent that can call MCP tools and return
+the requested JSON schema. The host is not consulted after every click. It is
+only used for free text, uncatalogued URLs, and final-screen interpretation.
 
-## Kullanım
+## Installation
 
-Ajanına: **“Jev Computer Use Windows uyarlamasını kullanarak [görev] yap.”**
+Requirements: Windows 10/11, Python 3.12 or newer, Node.js 20 or newer, and a
+TypeSafe Jev API key or Vercel AI Gateway key with access to Jev.
 
-1. `typesafe_windows` ile hedef pencere seçilir.
-2. `typesafe_run(goal, windowTitle, act=true)` başlatılır. `act=false` yalnız karar üretir.
-3. `typesafe_wait` çalışmayı bekler; `needs_host` varsa ana ajan verilen bağlamı okur.
-4. Ana ajan `typesafe_respond` ile tam istenen JSON alanlarını sağlar. Görsel varsa önce inceler.
-5. Aynı çalışan döngü devam eder. `typesafe_status` raporu, `typesafe_stop` durdurmayı sağlar.
+1. Download or clone the repository.
+2. Double-click `Install-Windows.cmd`. It creates `.venv`, installs Python and
+   Node dependencies, and generates a portable `mcp-config.json`.
+3. Open `1-Start.cmd`, choose **Change API key**, select your provider, and paste
+   your own key into the hidden prompt.
+4. Add the generated `mcp-config.json` server to your MCP host and restart it.
 
-Codex'te mevcut görev araç listesini yenilemiyorsa yeni görev açmak gerekebilir. Başka MCP istemcileri için `mcp-config.json` kullanılabilir. Doğrudan CLI, `.venv\Scripts\clicker.exe "hedef" --act --window-title "tam pencere başlığı"` biçimindedir. CLI'de bağımsız yazıcı kullanmak istersen Anthropic ortam ayarları özgün projedeki gibi desteklenir; bir ajanla kullanımda ek yardımcı model API anahtarı gerekmez.
+If you move the folder, choose **Generate and open MCP configuration** again and
+update the path in your host. Windows DPAPI binds the encrypted key to the Windows
+account that saved it, so each Windows account must enter its own key.
 
-## Anahtar ve veri
+## Agent workflow
 
-Mevcut Vercel anahtarı `config/vercel-key.dpapi` içinde bu Windows hesabına bağlı şifrelidir. `config/provider.json` sağlayıcıyı seçer. Doğrudan `TYPESAFE_API_KEY` veya Vercel `AI_GATEWAY_API_KEY` de desteklenir. Anahtar loglanmaz. Seçili pencerenin OCR/kontrol metni Jev sağlayıcısına, yazıcı istekleri ana ajana gider. Özgün projedeki gibi `runs/` klasörü ekran, görev ve eylem kayıtları tutar; özel görev kayıtlarını paylaşmadan önce inceleyin.
+Ask your agent, for example:
 
-## Doğrulanan sonuç
+> Use Jev Computer Use on the open inventory window. Select Chestnut, set the
+> priority to Low, save, and verify the final state.
 
-20 Eylül 2026: macOS ve Windows ortak mantığı ile Windows portuna ait toplam
-**181 test geçti**. Ruff kontrolleri geçti. Gerçek Windows formunda Jev, alanı
-seçti → ana ajandan metin istedi → metni yazdı ve Jev ile doğruladı → kutuyu
-işaretledi → Tamamla'ya bastı → `done` dedi. Son ekran ana ajan tarafından ve
-uygulamanın bağımsız kaydıyla doğrulandı.
+The host then follows this MCP flow:
 
-Kanıt: `runs/936403fc-8d69-4eea-9cec-c3daecb10426/run.json`, aynı klasörde adım ekranları/kararları ve `runs/windows-fixture-result-final.json`. Bu koşuda 5 Jev karar çevrimi, 4 uygulanan işlem vardı. Ortalama karar süresi 0,527 saniye; toplam 41,9 saniye ana ajanın yanıt bekleme ve son ekran inceleme sürelerini de içeriyor. Bunlar tek görevin ölçümleri; **100 kat hız iddiası veya genel başarı garantisi değildir**.
+1. Call `typesafe_windows` and select the unique intended window.
+2. Start `typesafe_run(goal, windowTitle, act=true)`. `act=false` predicts without
+   applying input.
+3. Poll with `typesafe_wait`. A `needs_host` result contains the exact context
+   and response schema.
+4. Inspect any supplied image, then answer with `typesafe_respond` using exactly
+   the requested JSON fields.
+5. Continue waiting until the worker returns its final report. Use
+   `typesafe_status` for progress and `typesafe_stop` to request a stop.
 
-## Sınırlar
+Some MCP hosts load tools only when a new task starts. If the tools do not appear
+after installation, fully restart the host or open a new task. Direct CLI use is
+also available:
 
-- Ana monitör desteklenir; hedefi burada tutun. İkinci monitör ve karma DPI kapsamlı test edilmedi.
-- PrintWindow bazı GPU/canvas uygulamalarında görüntü vermeyebilir. Böyle bir durumda ayrı görüntü yakalama desteği gerekir; masaüstündeki başka pencereye sessizce geçilmez.
-- Windows OCR kelime güveni sağlamaz; OCR'daki 1.0 değeri model güveni değildir. Türkçe/karma dil doğruluğu kurulu OCR diline bağlıdır.
-- Chrome/Edge adres çubuğu ve uygulama geçişi Windows'a uyarlanmıştır; gerçek web siteleri üzerinde bu sürümde uçtan uca test edilmedi. Aktif profil kullanılır; belirsiz çoklu pencere seçimi reddedilir.
-- Parola alanlarına yazılmaz. Terminal, parola yöneticisi, güvenlik ve kilit ekranı işlemleri ana kullanıcıya bırakılır. UAC aşılmaz.
-- Mouse sol üst köşeye götürülerek, `typesafe_stop` veya `0-Durdur.cmd` ile durdurulabilir. Gönderilmiş bir işlem geri alınmaz. Ana ajana dönüşte hedef alan değişmişse yazma durdurulur.
+```powershell
+.venv\Scripts\clicker.exe "your goal" --act --window-title "exact window title"
+```
 
-Tam uygulama eşdeğerliği henüz her Windows programında sınanmış değildir. Bu, özgün projenin çalışan Windows portudur; yalnız Not Defteri demosundan ibaret olan önceki kontrolcü değildir.
+The original Anthropic writer settings remain available for standalone CLI use.
+They are not required when an MCP host supplies text and verifies the result.
 
-## Kurulum ve yeniden kurulum
+## Keys and task data
 
-Python 3.12+ ve Node.js 20+ kurduktan sonra `Install-Windows.cmd` dosyasına çift
-tıklayın. Kurucu `.venv` ortamını, Python ve Node bağımlılıklarını ve taşınabilir
-MCP ayarını hazırlar. Ardından `1-Baslat.cmd` menüsünden API anahtarını girin.
-Klasörü taşırsanız menüdeki **MCP bağlantı dosyasını aç** seçeneğini yeniden
-çalıştırıp istemcinizdeki yolu güncelleyin. Başka Windows hesabında DPAPI
-anahtarını yeniden girmeniz gerekir.
+The setup menu stores the selected provider key under `config/` with Windows
+DPAPI encryption. Plain `TYPESAFE_API_KEY` and Vercel `AI_GATEWAY_API_KEY`
+environment variables are also supported. Keys are never logged.
+
+The selected window's OCR and control text is sent to the configured Jev
+provider. Host handoff packets go to the current MCP host. Screenshots, goals,
+decisions, and action traces remain local under `runs/`; review private run data
+before sharing it.
+
+## Verified behavior
+
+On September 20, 2026, the Windows port completed three live native visual tasks:
+
+- A grid form with item selection, priority selection, and save: 5.5 seconds.
+- A dynamic interface that required refresh, wait, option selection, and commit:
+  5.5 seconds.
+- A visual-code task requiring screenshot reading and host text handoff: success,
+  with 2.243 seconds of measured UI interaction after the host reply.
+
+The suite contains 183 passing tests. GitHub Actions passes on both Windows and
+macOS. These measurements describe the tested machine and fixtures; they are not
+a guarantee of a particular speedup or success rate for every application.
+
+## Limits and safety boundaries
+
+- The primary display is supported. Secondary displays and mixed-DPI layouts are
+  not comprehensively certified.
+- `PrintWindow` may not capture some GPU or canvas applications. The runtime does
+  not silently switch to an unrelated desktop window.
+- Windows OCR does not expose word confidence. A displayed OCR value of `1.0` is
+  not model confidence.
+- Browser address-bar handling uses the active browser profile, but arbitrary
+  live websites are outside this native-window test matrix. Use Jev Browser for
+  DOM-based Chrome tasks.
+- Password fields are refused. UAC, lock screens, password managers, terminals,
+  account security, and authentication remain under direct user control.
+- Request a stop with `typesafe_stop`, `0-Stop.cmd`, or the upper-left mouse abort
+  gesture. Input that has already been sent cannot be undone.
+- During a host text handoff, the runtime rechecks the original field before
+  writing. If focus or field state changed, it aborts instead of replaying input.
+
+This is a working Windows port of the upstream project. Full equivalence has not
+been certified across every Windows application.

@@ -28,14 +28,14 @@ key (or a Vercel AI Gateway key with access to Jev).
 
 1. Download or clone this repository.
 2. Double-click **`Install-Windows.cmd`**.
-3. Open **`1-Baslat.cmd`**, choose **API anahtarını değiştir**, and paste the key
+3. Open **`1-Start.cmd`**, choose **Change API key**, and paste the key
    into the hidden prompt.
 4. Add the generated `mcp-config.json` to Codex, Grok, Claude Desktop, or another
    MCP host, then restart that host.
 5. Ask the host to use **Jev Computer Use** on a specific open window.
 
 The API key is encrypted with Windows DPAPI and never stored as plaintext. See
-[WINDOWS.md](WINDOWS.md) for Turkish usage notes and [SECURITY.md](SECURITY.md)
+[WINDOWS.md](WINDOWS.md) for complete Windows instructions and [SECURITY.md](SECURITY.md)
 for the trust boundary.
 
 ```

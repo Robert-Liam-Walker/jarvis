@@ -27,4 +27,4 @@ if ($LASTEXITCODE -ne 0) { throw 'Node.js 20 or newer is required: https://nodej
 
 Write-Host ''
 Write-Host 'Installation complete.' -ForegroundColor Green
-Write-Host 'Next: open 1-Baslat.cmd, save your API key, then add mcp-config.json to your MCP host.'
+Write-Host 'Next: open 1-Start.cmd, save your API key, then add mcp-config.json to your MCP host.'
