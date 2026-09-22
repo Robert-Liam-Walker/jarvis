@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 
 import anthropic
-from typesafe_sdk import TypeSafeClient
+from typesafe_sdk import Choice, TypeSafeClient
 
 from . import macos
 from .config import SITES
@@ -27,6 +27,10 @@ class Context:
     typesafe: TypeSafeClient
     writer: anthropic.Anthropic | None
     history: list[str]
+    apps: dict[str, str] | None = None  # Jarvis: launchable app key -> description
+    windows: dict[str, str] | None = None  # Jarvis: open window title -> description
+    hotkeys: dict[str, str] | None = None  # Jarvis: shortcut key -> description
+    text_candidates: tuple[str, ...] = ()  # Jarvis: strings the utterance itself asked to type
 
 
 def is_noop(description: str) -> bool:
@@ -126,15 +130,35 @@ def _type_email(decision, screen: Screen, items, ctx: Context) -> str:
     return f"typed email {how}"
 
 
+def _text_from_utterance(ctx: Context, screen: Screen) -> str:
+    """The string to type when the goal itself carries it. Jev picks among several candidates."""
+    if len(ctx.text_candidates) == 1:
+        return ctx.text_candidates[0]
+    criteria = {str(i): repr(c) for i, c in enumerate(ctx.text_candidates)}
+    criteria["none"] = "None of these is the text the goal wants typed into this field."
+    answer = ctx.typesafe.system_one(
+        state={"goal": ctx.goal, "focused_field": screen.field.summary() if screen.field else None},
+        questions={
+            "text": Choice(
+                instructions="Which candidate is exactly the text the goal asks to type into the focused field?",
+                criteria=criteria,
+            )
+        },
+    ).answers["text"]
+    return "" if answer.choice == "none" else ctx.text_candidates[int(answer.choice)]
+
+
 def _type_text(decision, screen: Screen, items, ctx: Context) -> str:
     if not (screen.field and screen.field.is_text):
         return "type_text refused: no text field is focused"
-    if ctx.writer is None:
-        return "type_text refused: no writer available"
-    text = compose_text(ctx.writer, ctx.goal, screen, items, ctx.history)
+    text = _text_from_utterance(ctx, screen) if ctx.text_candidates else ""
+    if not text:
+        if ctx.writer is None:
+            return "type_text refused: no writer available"
+        text = compose_text(ctx.writer, ctx.goal, screen, items, ctx.history)
     if not text:
         return "type_text refused: writer declined to fill this field"
-    if hasattr(ctx.writer, "structured") and hasattr(macos, "prepare_after_host"):
+    if ctx.writer is not None and hasattr(ctx.writer, "structured") and hasattr(macos, "prepare_after_host"):
         macos.prepare_after_host(screen)
     how = fill_field(screen.field, text)
     time.sleep(0.3)
@@ -167,8 +191,38 @@ def _wait(decision, screen, items, ctx) -> str:
     return "waited"
 
 
+def _open_app(decision: Decision, screen, items, ctx: Context) -> str:
+    app = decision.app.choice if decision.app else "none"
+    if app == "none":
+        return "open_app refused: no application chosen"
+    from jarvis.launcher import open_app
+
+    launched = open_app(app)
+    return f"opened {launched.app} ({launched.title!r}, {launched.seconds}s)"
+
+
+def _switch_window(decision: Decision, screen, items, ctx: Context) -> str:
+    title = decision.window.choice if decision.window else "none"
+    if title == "none":
+        return "switch_window refused: no window chosen"
+    from jarvis.launcher import switch_to
+
+    return f"switched to {switch_to(title)!r}"
+
+
+def _hotkey(decision: Decision, screen, items, ctx: Context) -> str:
+    combo = decision.hotkey.choice if decision.hotkey else "none"
+    if combo == "none":
+        return "hotkey refused: no shortcut chosen"
+    macos.hotkey(combo)
+    return f"pressed {combo}"
+
+
 _HANDLERS = {
     "use_browser": _use_browser,
+    "open_app": _open_app,
+    "switch_window": _switch_window,
+    "hotkey": _hotkey,
     "type_email": _type_email,
     "type_text": _type_text,
     "press_enter": _key("return", "pressed Return"),

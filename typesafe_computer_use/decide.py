@@ -20,7 +20,14 @@ PRESS_OFFSCREEN = (
 )
 
 
-def fixed_actions(browser: str, email: str | None, can_type_text: bool = True) -> dict[str, str]:
+def fixed_actions(
+    browser: str,
+    email: str | None,
+    can_type_text: bool = True,
+    apps: bool = False,
+    windows: bool = False,
+    hotkeys: bool = False,
+) -> dict[str, str]:
     """Deterministic actions offered alongside click_item. Keep them mutually exclusive."""
     actions = {
         "use_browser": (
@@ -47,14 +54,37 @@ def fixed_actions(browser: str, email: str | None, can_type_text: bool = True) -
             "Type the user's email address into the focused text field. Use this, not type_text, "
             "whenever the field wants an email or username."
         )
+    if apps:
+        actions["open_app"] = (
+            "Launch an application (chosen in the app question) and bring it to the front. Use when the "
+            "goal needs a program that is not the frontmost one and not already open."
+        )
+    if windows:
+        actions["switch_window"] = (
+            "Bring a different, already open window to the front (chosen in the window question). Use "
+            "when the goal continues in another open program."
+        )
+    if hotkeys:
+        actions["hotkey"] = (
+            "Press a keyboard shortcut (chosen in the hotkey question), such as save, undo, find, or "
+            "close. Use only when the goal names that operation and no on-screen control does it."
+        )
     return actions
 
 
-def kind_criteria(browser: str, email: str | None, offscreen: bool = False, can_type_text: bool = True) -> dict[str, str]:
+def kind_criteria(
+    browser: str,
+    email: str | None,
+    offscreen: bool = False,
+    can_type_text: bool = True,
+    apps: bool = False,
+    windows: bool = False,
+    hotkeys: bool = False,
+) -> dict[str, str]:
     clicks = {"click_item": "Click one of the on-screen text items (chosen in the item question)."}
     if offscreen:
         clicks["press_offscreen"] = PRESS_OFFSCREEN
-    return {**clicks, **fixed_actions(browser, email, can_type_text)}
+    return {**clicks, **fixed_actions(browser, email, can_type_text, apps, windows, hotkeys)}
 
 
 def can_type_focused_field(screen: Screen, history: list[str]) -> bool:
@@ -228,10 +258,11 @@ def site_criteria() -> dict[str, str]:
     }
 
 
-def base_state(goal: str, screen: Screen, items: list[Item], history: list[str]) -> dict:
+def base_state(goal: str, screen: Screen, items: list[Item], history: list[str], extras: dict | None = None) -> dict:
     hints = date_hints(items, screen)
     offscreen = [] if _goal_offscreen_refused(screen.offscreen, goal, history) else offscreen_records(screen.offscreen, history)
     return {
+        **(extras or {}),
         "goal": goal,
         "now": now_context(),
         "frontmost_app": screen.app,
@@ -259,6 +290,9 @@ class Decision:
     item: ChoiceAnswer | None
     site: ChoiceAnswer
     offscreen: ChoiceAnswer | None = None
+    app: ChoiceAnswer | None = None
+    window: ChoiceAnswer | None = None
+    hotkey: ChoiceAnswer | None = None
 
     @property
     def clicking(self) -> bool:
@@ -286,6 +320,9 @@ class Decision:
             return min(self.kind.confidence, self.item.confidence)
         if self.pressing_offscreen:
             return min(self.kind.confidence, self.offscreen.confidence)
+        secondary = {"open_app": self.app, "switch_window": self.window, "hotkey": self.hotkey}.get(self.kind.choice)
+        if secondary is not None:
+            return min(self.kind.confidence, secondary.confidence)
         return self.kind.confidence
 
     @property
@@ -294,7 +331,16 @@ class Decision:
 
 
 def decide(
-    client: TypeSafeClient, goal: str, screen: Screen, items: list[Item], history: list[str], browser: str, email: str | None
+    client: TypeSafeClient,
+    goal: str,
+    screen: Screen,
+    items: list[Item],
+    history: list[str],
+    browser: str,
+    email: str | None,
+    apps: dict[str, str] | None = None,
+    windows: dict[str, str] | None = None,
+    hotkeys: dict[str, str] | None = None,
 ) -> Decision:
     item_choices = item_criteria(screen, items, goal, history) if items else {}
     offscreen = {} if _goal_offscreen_refused(screen.offscreen, goal, history) else offscreen_criteria(screen.offscreen, history)
@@ -325,6 +371,9 @@ def decide(
         email,
         bool(offscreen),
         can_type_text=can_type_focused_field(screen, history),
+        apps=bool(apps),
+        windows=bool(windows),
+        hotkeys=bool(hotkeys),
     )
     if not item_choices:
         kind_choices.pop("click_item", None)
@@ -404,8 +453,32 @@ def decide(
             ),
             criteria=offscreen,
         )
-    answers = client.system_one(state=base_state(goal, screen, items, history), questions=questions).answers
-    return Decision(kind=answers["kind"], item=answers.get("item"), site=answers["site"], offscreen=answers.get("offscreen"))
+    if apps:
+        questions["app"] = Choice(
+            instructions="If launching an application is the right move, which one? 'none' when no launch is needed.",
+            criteria={**apps, "none": "No application needs to be launched this step."},
+        )
+    if windows:
+        questions["window"] = Choice(
+            instructions="If switching to another open window is the right move, which one? 'none' to stay here.",
+            criteria={**windows, "none": "Stay in the current window."},
+        )
+    if hotkeys:
+        questions["hotkey"] = Choice(
+            instructions="If a keyboard shortcut is the right move, which one? 'none' when no shortcut applies.",
+            criteria={**hotkeys, "none": "No shortcut applies this step."},
+        )
+    extras = {"open_windows": list(windows)} if windows else None
+    answers = client.system_one(state=base_state(goal, screen, items, history, extras), questions=questions).answers
+    return Decision(
+        kind=answers["kind"],
+        item=answers.get("item"),
+        site=answers["site"],
+        offscreen=answers.get("offscreen"),
+        app=answers.get("app"),
+        window=answers.get("window"),
+        hotkey=answers.get("hotkey"),
+    )
 
 
 def verify_typed(client: TypeSafeClient, goal: str, field_before: Field, typed: str, field_after: Field | None) -> float:

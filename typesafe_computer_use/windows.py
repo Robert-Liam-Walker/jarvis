@@ -649,3 +649,100 @@ def actionable_elements(pid, display_w_pt, display_h_pt):
         [replace(node, state=_control_state(node.ref)) for node in hidden],
         capped,
     )
+
+
+# ---- Jarvis additions: window discovery, launching, switching, hotkeys ----
+
+
+def list_windows():
+    """Every visible top-level window: title, process name, pid and handle."""
+    found = []
+    for control in auto.GetRootControl().GetChildren():
+        try:
+            if control.Name and not control.IsOffscreen:
+                found.append(
+                    {
+                        "title": control.Name,
+                        "exe": psutil.Process(control.ProcessId).name(),
+                        "pid": control.ProcessId,
+                        "handle": control.NativeWindowHandle,
+                    }
+                )
+        except (OSError, psutil.Error):
+            continue
+    return found
+
+
+def launch_app(target):
+    """Start an application the way the Run box would: App Paths, PATH, and protocol handlers all resolve."""
+    import subprocess
+
+    if any(ch in target for ch in "\r\n&|<>"):
+        raise Abort("refusing to launch a target with shell metacharacters")
+    subprocess.Popen(["cmd", "/c", "start", "", target], creationflags=subprocess.CREATE_NO_WINDOW)
+
+
+def find_window(title=None, exe=None, exclude_handles=()):
+    """The first visible window whose title contains `title` or whose process is `exe`, or None.
+
+    Either match suffices: packaged (UWP) apps such as Calculator and Settings own their content but
+    their top-level window belongs to ApplicationFrameHost.exe, so the process name alone misses them.
+    """
+    for window in list_windows():
+        if window["handle"] in exclude_handles:
+            continue
+        by_title = bool(title) and title.lower() in window["title"].lower()
+        by_exe = bool(exe) and window["exe"].lower() == exe.lower()
+        if by_title or by_exe:
+            return window
+    return None
+
+
+def wait_for_window(title=None, exe=None, timeout=8.0, exclude_handles=()):
+    """Poll until a matching window exists. Returns its record, or None on timeout."""
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        check_abort()
+        window = find_window(title, exe, exclude_handles)
+        if window:
+            return window
+        time.sleep(0.15)
+    return None
+
+
+def activate_handle(hwnd, timeout=3.0):
+    """Bring one known window forward and make it the observed window for the guard."""
+    global _observed_hwnd
+    with contextlib.suppress(Exception):
+        auto.ControlFromHandle(hwnd).SetActive()
+    if not _focus_window(hwnd, timeout):
+        return False
+    _observed_hwnd = _foreground()
+    return True
+
+
+HOTKEYS = {
+    "ctrl+s": "{Ctrl}s",
+    "ctrl+z": "{Ctrl}z",
+    "ctrl+y": "{Ctrl}y",
+    "ctrl+f": "{Ctrl}f",
+    "ctrl+a": "{Ctrl}a",
+    "ctrl+c": "{Ctrl}c",
+    "ctrl+v": "{Ctrl}v",
+    "ctrl+n": "{Ctrl}n",
+    "ctrl+t": "{Ctrl}t",
+    "ctrl+w": "{Ctrl}w",
+    "alt+f4": "{Alt}{F4}",
+    "win+d": "{Win}d",
+    "win+left": "{Win}{Left}",
+    "win+right": "{Win}{Right}",
+    "win+up": "{Win}{Up}",
+}
+
+
+def hotkey(combo):
+    _guard()
+    keys = HOTKEYS.get(combo)
+    if keys is None:
+        raise Abort(f"unknown hotkey {combo!r}")
+    auto.SendKeys(keys, waitTime=0.04)

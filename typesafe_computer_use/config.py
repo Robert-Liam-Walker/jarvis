@@ -14,6 +14,23 @@ DEFAULT_DELAY = 2.0
 DEFAULT_WRITER_MODEL = "claude-haiku-4-5"
 DEFAULT_ANSWER_MODEL = "claude-sonnet-5"  # runs once per run, on a screenshot: worth a stronger reader
 DEFAULT_BROWSER = "Google Chrome"
+JARVIS_DELAY = 0.4  # seconds between steps when Jarvis drives; the CLI default is tuned for slow apps
+
+# Applications Jarvis can launch by name. `launch` goes through `start`, so App Paths and
+# protocol handlers resolve; `exe` and `title` identify the window that appears afterwards.
+# `fresh` means always open a new window instead of focusing one that is already open.
+APPS: dict[str, dict[str, str]] = {
+    "notepad": {"launch": "notepad", "exe": "notepad.exe", "title": "Notepad", "fresh": "yes"},
+    "chrome": {"launch": "chrome", "exe": "chrome.exe", "title": "Google Chrome"},
+    "edge": {"launch": "msedge", "exe": "msedge.exe", "title": "Microsoft Edge"},
+    "explorer": {"launch": "explorer", "exe": "explorer.exe", "title": ""},
+    "terminal": {"launch": "wt", "exe": "WindowsTerminal.exe", "title": ""},
+    "vscode": {"launch": "code", "exe": "Code.exe", "title": "Visual Studio Code"},
+    "settings": {"launch": "ms-settings:", "exe": "SystemSettings.exe", "title": "Settings"},
+    "calculator": {"launch": "calc", "exe": "CalculatorApp.exe", "title": "Calculator"},
+    "spotify": {"launch": "spotify", "exe": "Spotify.exe", "title": "Spotify"},
+    "discord": {"launch": "discord", "exe": "Discord.exe", "title": "Discord"},
+}
 
 # Sites the classifier can pick by name. Anything else goes through the writer.
 SITES: dict[str, str] = {

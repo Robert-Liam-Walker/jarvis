@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -45,6 +46,8 @@ class RunConfig:
     image: Path | None = None  # replay a saved capture (never acts)
     app: str | None = None  # frontmost app to report during replay
     url: str | None = None  # browser URL to report during replay
+    window_title: str | None = None  # Jarvis: activate this exact window before the first step
+    on_event: Callable[[str, dict], None] | None = None  # Jarvis: narration hook (decision, acted, outcome)
 
     @property
     def replay(self) -> bool:
@@ -63,8 +66,17 @@ class RunState:
     answer: Answer | None = None
 
 
-def run(cfg: RunConfig, ctx_factory) -> RunState:
-    """Drive the loop. ctx_factory(typesafe, history) builds the action Context."""
+def emit(cfg: RunConfig, kind: str, **payload) -> None:
+    if cfg.on_event is not None:
+        cfg.on_event(kind, payload)
+
+
+def run(cfg: RunConfig, ctx_factory, client: TypeSafeClient | None = None) -> RunState:
+    """Drive the loop. ctx_factory(typesafe, history) builds the action Context.
+
+    Pass `client` to reuse one open TypeSafeClient across runs (Jarvis keeps a single resident one);
+    otherwise a client is opened for this run and closed with it.
+    """
     cfg.out.mkdir(parents=True, exist_ok=True)
     log = Log(cfg.out / "run.log")
     log(f"run folder: {cfg.out}")
@@ -74,20 +86,17 @@ def run(cfg: RunConfig, ctx_factory) -> RunState:
     state = RunState()
     started = time.time()
     try:
-        with TypeSafeClient(
-            base_url=os.environ.get("TYPESAFE_BASE_URL"), model=os.environ.get("TYPESAFE_DEFAULT_MODEL"), timeout=20
-        ) as typesafe:
-            ctx = ctx_factory(typesafe, state.history)
-            for step in range(1, cfg.steps + 1):
-                if not run_step(cfg, ctx, state, step, log):
-                    break
-            else:
-                log(f"\nstopped after {cfg.steps} steps")
-                state.outcome = "step limit"
-            conclude(cfg, ctx, state, log)
+        if client is not None:
+            _drive(cfg, ctx_factory, state, client, log)
+        else:
+            with TypeSafeClient(
+                base_url=os.environ.get("TYPESAFE_BASE_URL"), model=os.environ.get("TYPESAFE_DEFAULT_MODEL"), timeout=20
+            ) as typesafe:
+                _drive(cfg, ctx_factory, state, typesafe, log)
     except (KeyboardInterrupt, Abort) as e:
         state.outcome = f"aborted ({e or 'Ctrl-C'})"
         log(f"\n{state.outcome} after {len(state.history)} actions")
+        emit(cfg, "outcome", outcome=state.outcome, steps=len(state.history))
     finally:
         summary = {
             "goal": cfg.goal,
@@ -104,6 +113,21 @@ def run(cfg: RunConfig, ctx_factory) -> RunState:
         (cfg.out / "run.json").write_text(json.dumps(summary, indent=2))
         log(f"run folder: {cfg.out}")
     return state
+
+
+def _drive(cfg: RunConfig, ctx_factory, state: RunState, typesafe: TypeSafeClient, log: Log) -> None:
+    if cfg.window_title and not cfg.replay:
+        macos.activate_title(cfg.window_title)
+        macos.sleep_watching(0.2)
+    ctx = ctx_factory(typesafe, state.history)
+    for step in range(1, cfg.steps + 1):
+        if not run_step(cfg, ctx, state, step, log):
+            break
+    else:
+        log(f"\nstopped after {cfg.steps} steps")
+        state.outcome = "step limit"
+    emit(cfg, "outcome", outcome=state.outcome, steps=len(state.history))
+    conclude(cfg, ctx, state, log)
 
 
 def conclude(cfg: RunConfig, ctx: Context, state: RunState, log: Log) -> None:
@@ -149,7 +173,18 @@ def run_step(cfg: RunConfig, ctx: Context, state: RunState, step: int, log: Log)
     )
 
     with phase(timing, "decide"):
-        decision = decide(ctx.typesafe, cfg.goal, screen, items, state.history, ctx.browser, ctx.email)
+        decision = decide(
+            ctx.typesafe, cfg.goal, screen, items, state.history, ctx.browser, ctx.email, ctx.apps, ctx.windows, ctx.hotkeys
+        )
+    emit(
+        cfg,
+        "decision",
+        step=step,
+        app=screen.app,
+        chosen=decision.chosen,
+        kind=decision.kind.choice,
+        confidence=decision.confidence,
+    )
     by_index = {str(it.index): it for it in items}
     annotate(screen, items, decision.chosen, prefix.with_suffix(".png"))
 
@@ -217,6 +252,7 @@ def resolve(
     state.last_url = screen.url
     state.history.append(what)
     log(f"  did: {what}")
+    emit(cfg, "acted", what=what)
     if is_noop(what) or repeated:
         state.consecutive_noops += 1
         if state.consecutive_noops >= MAX_CONSECUTIVE_NOOPS:
