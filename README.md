@@ -59,6 +59,27 @@ Needs a TypeSafe Jev key (`TYPESAFE_API_KEY`, or the setup menu below). Speech r
 locally on the GPU when one is present. Text the utterance itself carries ("write hello") is typed
 without any language model; the app catalog lives in `typesafe_computer_use/config.py`.
 
+### Persistent: it also watches while you are away
+
+Jarvis is becoming a resident, event-driven agent (see `docs/persistent-agent-plan.md`). The first
+slice is in: a SQLite store under `%LOCALAPPDATA%\jarvis`, an event bus, a world model that is
+rebuilt on restart, cheap observers (process table, user presence, foreground window, a timer), and
+an evaluator that asks Jev whether an event is worth acting on. The only actions today are READ
+level: say a sentence, show a toast. GUI capabilities are denied by policy while you are at the
+keyboard unless you asked for them.
+
+```powershell
+uv run jarvis watch --no-jev              # observers + standing rules, no key needed
+uv run jarvis watch                       # same, with Jev judging each event
+uv run jarvis status                      # world model, recent events and decisions, from the store
+uv run jarvis listen                      # the voice loop now runs the observers alongside
+```
+
+Which processes are watched, the idle threshold, and the Jev budget live in
+`%LOCALAPPDATA%\jarvis\config.json`, written with defaults on first run. Kill the daemon, start
+a program, restart it, and `jarvis status` shows the program: reconcile found it. A watched process
+that exited while the daemon was down is announced on the next start.
+
 ## Windows quick start
 
 Requirements: Windows 10/11, Python 3.12+, Node.js 20+, and a TypeSafe Jev API key

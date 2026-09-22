@@ -16,8 +16,8 @@ from typesafe_computer_use.models import Abort
 from typesafe_computer_use.runner import STOPPED, RunConfig, run
 from typesafe_computer_use.writer import make_writer
 
-from . import extract, fastpath, launcher, stopkey, system
-from .gates import Confirmer, Gate
+from . import extract, fastpath, launcher, policy, stopkey, system
+from .gates import Confirmer
 
 Narrator = Callable[[str], None]
 MIN_INTENT_CONFIDENCE = 0.45
@@ -73,7 +73,7 @@ class Agent:
         self.act = act
         self.writer = make_writer()
         self.confirmer = confirmer or Confirmer(ask=narrate)
-        self.gate = Gate(client, self.confirmer)
+        self.gate = policy.step_gate(client, self.confirmer)
 
     def say(self, utterance: str) -> Result:
         """Handle one utterance end to end: one Jev call to classify it, then the deterministic or screen path."""
