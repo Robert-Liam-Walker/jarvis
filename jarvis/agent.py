@@ -16,7 +16,8 @@ from typesafe_computer_use.models import Abort
 from typesafe_computer_use.runner import STOPPED, RunConfig, run
 from typesafe_computer_use.writer import make_writer
 
-from . import extract, fastpath, launcher, system
+from . import extract, fastpath, launcher, stopkey, system
+from .gates import Confirmer, Gate
 
 Narrator = Callable[[str], None]
 MIN_INTENT_CONFIDENCE = 0.45
@@ -58,12 +59,21 @@ def hotkey_criteria() -> dict[str, str]:
 
 
 class Agent:
-    def __init__(self, client: TypeSafeClient, narrate: Narrator = print, runs_dir: Path | None = None, act: bool = True):
+    def __init__(
+        self,
+        client: TypeSafeClient,
+        narrate: Narrator = print,
+        runs_dir: Path | None = None,
+        act: bool = True,
+        confirmer: Confirmer | None = None,
+    ):
         self.client = client
         self.narrate = narrate
         self.runs_dir = runs_dir or Path("runs")
         self.act = act
         self.writer = make_writer()
+        self.confirmer = confirmer or Confirmer(ask=narrate)
+        self.gate = Gate(client, self.confirmer)
 
     def say(self, utterance: str) -> Result:
         """Handle one utterance end to end: one Jev call to classify it, then the deterministic or screen path."""
@@ -112,7 +122,9 @@ class Agent:
             delay=config.JARVIS_DELAY,
             window_title=window_title,
             on_event=self._on_event,
+            gate=self.gate,
         )
+        stopkey.clear_stop()
 
         def ctx_factory(typesafe, history):
             return Context(
@@ -128,7 +140,10 @@ class Agent:
                 text_candidates=candidates,
             )
 
-        return run(cfg, ctx_factory, client=self.client)
+        try:
+            return run(cfg, ctx_factory, client=self.client)
+        finally:
+            stopkey.clear_stop()
 
     def _on_event(self, kind: str, payload: dict) -> None:
         if kind == "acted":

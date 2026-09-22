@@ -6,6 +6,8 @@ import queue
 import threading
 import time
 
+from . import stopkey
+from .gates import Confirmer
 from .voice.listener import Listener
 from .voice.tts import Speaker
 
@@ -25,17 +27,28 @@ def _worker(inbox: queue.Queue, handle, speaking: threading.Event) -> None:
                 print(f"jarvis: error: {e}", flush=True)
 
 
-def listen(handle=None, device: int | None = None, hear_only: bool = False, wake_threshold: float = 0.6) -> None:
+def listen(
+    handle=None,
+    device: int | None = None,
+    hear_only: bool = False,
+    wake_threshold: float = 0.6,
+    confirmer: Confirmer | None = None,
+) -> None:
     """Block on the microphone. `handle(text)` runs on the worker thread for every utterance.
 
     With `hear_only`, transcripts are printed and spoken back, and nothing is driven: a microphone and
-    model check that needs no Jev key.
+    model check that needs no Jev key. While a confirmation question is pending, the next utterance
+    answers it instead of starting a new request. Ctrl+Shift+Backspace stops the current run.
     """
     speaker = Speaker()
     inbox: queue.Queue = queue.Queue()
+    stopkey.clear_stop()
+    stopkey.start(on_stop=lambda: speaker.say("Stopping."))
 
     def on_utterance(text: str) -> None:
         print(f"heard: {text}", flush=True)
+        if confirmer is not None and confirmer.answer(text):
+            return
         if hear_only:
             speaker.say(f"I heard: {text}")
         else:

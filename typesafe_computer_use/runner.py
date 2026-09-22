@@ -32,6 +32,7 @@ STOPPED = {
     "low confidence": "the classifier was not confident enough in any next action",
     "stalled": "the last actions changed nothing",
     "step limit": "the run used every step it was allowed",
+    "declined": "the person did not confirm an action that could not be undone",
 }
 
 
@@ -48,6 +49,7 @@ class RunConfig:
     url: str | None = None  # browser URL to report during replay
     window_title: str | None = None  # Jarvis: activate this exact window before the first step
     on_event: Callable[[str, dict], None] | None = None  # Jarvis: narration hook (decision, acted, outcome)
+    gate: Callable[[Decision, Screen, list[Item], str], bool] | None = None  # Jarvis: veto before an action lands
 
     @property
     def replay(self) -> bool:
@@ -241,6 +243,10 @@ def resolve(
     if not cfg.act or cfg.replay:
         log(f"  would do: {decision.chosen}. dry run (pass --act without --image to drive the machine)")
         state.outcome = "dry run"
+        return False
+    if cfg.gate is not None and not cfg.gate(decision, screen, items, cfg.goal):
+        log(f"  {decision.chosen} needs confirmation and did not get it; stopping")
+        state.outcome = "declined"
         return False
 
     with phase(timing, "act"):

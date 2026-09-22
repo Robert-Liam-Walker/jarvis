@@ -6,6 +6,7 @@ import argparse
 import sys
 
 from .agent import Agent, make_client
+from .gates import Confirmer
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -25,8 +26,10 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     if args.command == "say":
+        confirmer = Confirmer(ask=lambda q: None)
+        confirmer.ask = lambda q: confirmer.answer(input(f"jarvis: {q} [yes/no] ").strip())  # typed answer, synchronous
         with make_client() as client:
-            result = Agent(client, act=not args.dry_run).say(args.utterance)
+            result = Agent(client, act=not args.dry_run, confirmer=confirmer).say(args.utterance)
         print(f"[{result.outcome} in {result.seconds}s, {result.steps} steps]")
         sys.exit(0 if result.outcome in ("done", "dry run") else 1)
 
@@ -41,8 +44,10 @@ def main(argv: list[str] | None = None) -> None:
             run_listen(None, device=device, hear_only=True, wake_threshold=args.wake_threshold)
             return
         with make_client() as client:
-            agent = Agent(client, act=not args.dry_run)
-            run_listen(agent.say, device=device, wake_threshold=args.wake_threshold)
+            speaker_confirmer = Confirmer(ask=lambda q: None)
+            agent = Agent(client, act=not args.dry_run, confirmer=speaker_confirmer)
+            speaker_confirmer.ask = agent.narrate  # spoken question; the next utterance answers it
+            run_listen(agent.say, device=device, wake_threshold=args.wake_threshold, confirmer=speaker_confirmer)
 
 
 if __name__ == "__main__":
