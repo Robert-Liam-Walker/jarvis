@@ -36,6 +36,29 @@ sequence of clicks.
 The macOS backend remains available. Its installation, architecture and historical
 benchmarks are preserved in the [upstream macOS reference](docs/upstream-macos-reference.md).
 
+## Jarvis: say it, and your PC does it
+
+This fork adds **Jarvis**, a voice-first, always-listening layer on top of the same Jev decision
+loop, the Windows counterpart of the macOS `jev-use` demos. Wake word, then speech, then one Jev
+call to classify the request, then either a deterministic action (launch, switch, volume, media)
+or the screen loop below. Claude is only consulted when words have to be composed.
+
+```text
+mic -> "hey jarvis" (openWakeWord) -> faster-whisper (CUDA) -> one Jev call: open_app | switch_window | system | goal
+     -> launch / switch / media key                      -> existing perceive -> decide -> act loop, bound to that window
+```
+
+```powershell
+uv sync
+uv run jarvis listen --hear-only          # microphone + models check, no key needed
+uv run jarvis say "open notepad and write hello"
+uv run jarvis listen                      # hands-free; Ctrl-C to stop
+```
+
+Needs a TypeSafe Jev key (`TYPESAFE_API_KEY`, or the setup menu below). Speech recognition runs
+locally on the GPU when one is present. Text the utterance itself carries ("write hello") is typed
+without any language model; the app catalog lives in `typesafe_computer_use/config.py`.
+
 ## Windows quick start
 
 Requirements: Windows 10/11, Python 3.12+, Node.js 20+, and a TypeSafe Jev API key
